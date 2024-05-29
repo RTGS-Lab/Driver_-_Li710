@@ -277,7 +277,7 @@ String LI710::getData(time_t time)
 			readDone = true; //Set flag
 			break; //Stop retry
 		}	
-		if(readDone == false) throwError(talon.SDI12_READ_FAIL); //Only throw read fail error if sensor SHOULD be detected 
+		if(readDone == false) throwError(talon.SDI12_READ_FAIL | talonPortErrorCode | sensorPortErrorCode); //Only throw read fail error if sensor SHOULD be detected 
 	}
 	else throwError(FIND_FAIL);
 	
@@ -339,7 +339,10 @@ bool LI710::parseData(String input, float dataReturn[], uint8_t dataLen)
 	for(int i = 0; i < strLen; i++){
 		if(inputArr[i] == '+' or inputArr[i] == '-') numSeps += 1; //Increment seperator count if either +/- is found (Note: CRC vals to not contain + or -)
 	}
-	if(numSeps != dataLen) return false; //Return error if number of seperators does not match the requested number of values
+	if(numSeps != dataLen) {
+		throwError(talon.SDI12_SENSOR_MISMATCH | 0x300 | talonPortErrorCode | sensorPortErrorCode); //Throw an error to indicate mismatch in number of reports
+		return false; //Return error if number of seperators does not match the requested number of values
+	}
 
 	// float sensorData[9] = {0.0}; //Store the 9 vals from the sensor in float form
 	
@@ -409,8 +412,8 @@ bool LI710::decodeDiag(uint16_t diagCode)
 
 	if(errorBits > 0 || warningBits > 0) { //Only bother to process if one of them is actually set
 		for(int i = 0; i < 16; i++) {
-			if(errorBits & 0x01) throwError(LI710_ERROR | (i << 8) | talonPortErrorCode); //Throw an individual error with unique code for each error present
-			if(warningBits & 0x01) throwError(LI710_WARNING | (i << 8) | talonPortErrorCode); //Throw an individual warning with unique code for each warning present
+			if(errorBits & 0x01) throwError(LI710_ERROR | (i << 8) | talonPortErrorCode | sensorPortErrorCode); //Throw an individual error with unique code for each error present
+			if(warningBits & 0x01) throwError(LI710_WARNING | (i << 8) | talonPortErrorCode | sensorPortErrorCode); //Throw an individual warning with unique code for each warning present
 			errorBits = errorBits >> 1; //Bit shift vals
 			warningBits = warningBits >> 1;
 		}
