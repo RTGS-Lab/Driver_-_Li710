@@ -1,6 +1,6 @@
 //© 2023 Regents of the University of Minnesota. All rights reserved.
 
-#include <LI710.h>
+#include <Li710.h>
 
 LI710::LI710(SDI12Talon& talon_, uint8_t talonPort_, uint8_t sensorPort_, uint8_t version): talon(talon_)
 {
