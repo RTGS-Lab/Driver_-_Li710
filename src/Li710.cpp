@@ -2,7 +2,7 @@
 
 #include <Li710.h>
 
-LI710::LI710(SDI12Talon& talon_, uint8_t talonPort_, uint8_t sensorPort_, uint8_t version): talon(talon_)
+LI710::LI710(ITimeProvider& timeProvider_, ISDI12Talon& talon_, uint8_t talonPort_, uint8_t sensorPort_, uint8_t version): talon(talon_), timeProvider(timeProvider_)
 {
 	//Only update values if they are in range, otherwise stick with default values
 	if(talonPort_ > 0) talonPort = talonPort_ - 1;
@@ -129,14 +129,14 @@ String LI710::getMetadata()
 {
 	uint8_t adr = (talon.sendCommand("?!")).toInt(); //Get address of local device 
 	String id = talon.command("I", adr);
-	Serial.println(id); //DEBUG!
+	//Serial.println(id); //DEBUG!
 	String sdi12Version;
 	String mfg;
 	String model;
 	String senseVersion;
 	String sn;
 	if((id.substring(0, 1)).toInt() != adr) { //If address returned is not the same as the address read, throw error
-		Serial.println("ADDRESS MISMATCH!"); //DEBUG!
+		//Serial.println("ADDRESS MISMATCH!"); //DEBUG!
 		//Throw error!
 		sdi12Version = "null";
 		mfg = "null";
@@ -171,7 +171,7 @@ String LI710::getData(time_t time)
 	String output = "\"LiCor ET\":{"; //OPEN JSON BLOB
 	bool readDone = false;
 	if(getSensorPort() != 0) { //Check both for detection 
-		for(int i = 0; i < talon.retryCount; i++) {
+		for(int i = 0; i < LI710_RETRY_COUNT; i++) {
 			if(!isPresent()) {
 				// Serial.print("LI710 PRESENT FAIL"); //DEBUG!
 				continue; //If presence check fails, try again
@@ -200,11 +200,11 @@ String LI710::getData(time_t time)
 			talon.command("XT", adr); //Start next round of conversion 
 			// delay(waitTime*1000 + 500); //Wait for number of seconds requested, plus half a second to make sure
 			String data0 = talon.continuousMeasurmentCRC(0, adr);
-			delay(100);
+			timeProvider.delay(100);
 			String data1 = talon.continuousMeasurmentCRC(1, adr);
-			delay(100);
+			timeProvider.delay(100);
 			String data2 = talon.continuousMeasurmentCRC(2, adr);
-			delay(100);
+			timeProvider.delay(100);
 
 			// talon.testCRC(data1); //DEBUG!
 			if(!talon.testCRC(data0) || !talon.testCRC(data1) || !talon.testCRC(data2)) {
@@ -277,14 +277,14 @@ String LI710::getData(time_t time)
 			readDone = true; //Set flag
 			break; //Stop retry
 		}	
-		if(readDone == false) throwError(talon.SDI12_READ_FAIL | talonPortErrorCode | sensorPortErrorCode); //Only throw read fail error if sensor SHOULD be detected 
+		if(readDone == false) throwError(LI710_SDI12_READ_FAIL | talonPortErrorCode | sensorPortErrorCode); //Only throw read fail error if sensor SHOULD be detected 
 	}
 	else throwError(FIND_FAIL);
 	
 	if(getSensorPort() == 0 || readDone == false) output = output + "\"ET\":null,\"LE\":null,\"H\":null,\"VPD\":null,\"PA\":null,\"TA\":null,\"RH\":null,\"SAMP_CNT\":null,\"AH\":null,\"SVP\":null,\"TD\":null"; //Append nulls if no sensor port found, or read did not work
 	output = output + ",\"Pos\":[" + getTalonPortString() + "," + getSensorPortString() + "]"; //Concatonate position 
 	output = output + "}"; //CLOSE JSON BLOB
-	Serial.println(output); //DEBUG!
+	//Serial.println(output); //DEBUG!
 	return output;
 }
 
@@ -315,8 +315,8 @@ int LI710::indexOfSep(String input)
 {
 	int pos1 = input.indexOf('+');
 	int pos2 = input.indexOf('-');
-	if(pos1 >= 0 && pos2 >= 0) return min(pos1, pos2); //If both are positive, just return the straight min
-	else return max(pos1, pos2); //If one of them is -1, then return the other one. If both are -1, then you should return -1 anyway
+	if(pos1 >= 0 && pos2 >= 0) return std::min(pos1, pos2); //If both are positive, just return the straight min
+	else return std::max(pos1, pos2); //If one of them is -1, then return the other one. If both are -1, then you should return -1 anyway
 }
 
 String LI710::appendData(float data, String label, uint8_t precision, bool appendComma)
@@ -340,7 +340,7 @@ bool LI710::parseData(String input, float dataReturn[], uint8_t dataLen)
 		if(inputArr[i] == '+' or inputArr[i] == '-') numSeps += 1; //Increment seperator count if either +/- is found (Note: CRC vals to not contain + or -)
 	}
 	if(numSeps != dataLen) {
-		throwError(talon.SDI12_SENSOR_MISMATCH | 0x300 | talonPortErrorCode | sensorPortErrorCode); //Throw an error to indicate mismatch in number of reports
+		throwError(LI710_SDI12_SENSOR_MISMATCH | 0x300 | talonPortErrorCode | sensorPortErrorCode); //Throw an error to indicate mismatch in number of reports
 		return false; //Return error if number of seperators does not match the requested number of values
 	}
 
@@ -439,8 +439,8 @@ String LI710::getErrors()
 	String output = "\"LiCor ET\":{"; // OPEN JSON BLOB
 	output = output + "\"CODES\":["; //Open codes pair
 
-	for(int i = 0; i < min(MAX_NUM_ERRORS, numErrors); i++) { //Interate over used element of array without exceeding bounds
-		output = output + "\"0x" + String(errors[i], HEX) + "\","; //Add each error code
+	for(int i = 0; i < std::min(MAX_NUM_ERRORS, (int)numErrors); i++) { //Interate over used element of array without exceeding bounds
+		output = output + "\"0x" + String(errors[i], (unsigned char)16) + "\","; //Add each error code
 		errors[i] = 0; //Clear errors as they are read
 	}
 	if(output.substring(output.length() - 1).equals(",")) {

@@ -6,7 +6,8 @@
 // #include "DPS368-Library-Arduino/src/Dps368.h"
 // #include "Adafruit_SHT31/src/Adafruit_SHT31.h"
 #include <Sensor.h>
-#include <SDI12Talon.h>
+#include "ISDI12Talon.h"  // Include the interface instead of the concrete implementation
+#include "ITimeProvider.h"
 
 class LI710: public Sensor
 {
@@ -26,9 +27,12 @@ class LI710: public Sensor
 
 	const uint32_t LI710_ERROR = 0xA0010000; //Prefix for the subset of true issues that the device can report
 	const uint32_t LI710_WARNING = 0xF01A0000; //Prefix for the subset of self resolving issues the device can report (rain, humidity, cold, etc)
-	
+    const uint32_t LI710_SDI12_READ_FAIL = 0xF0140000; //SDI12 Sensor at port failed to be read
+	const uint32_t LI710_SDI12_SENSOR_MISMATCH = 0xE0030000; //Sensor info mismatch with expected (1 = Address, 2 = report time, 3 = num reports)
+	const int LI710_RETRY_COUNT = 3; //number of attempts to read data from the sensor before giving up
+
 	public:
-		LI710(SDI12Talon& talon_, uint8_t talonPort_ = DEAFULT_PORT, uint8_t sensorPort_ = DEFAULT_SENSOR_PORT, uint8_t version = DEFAULT_VERSION);
+		LI710(ITimeProvider& timeProvider, ISDI12Talon& talon_, uint8_t talonPort_ = DEAFULT_PORT, uint8_t sensorPort_ = DEFAULT_SENSOR_PORT, uint8_t version = DEFAULT_VERSION);
 		String begin(time_t time, bool &criticalFault, bool &fault);
 		String getData(time_t time);
 		String selfDiagnostic(uint8_t diagnosticLevel = 4, time_t time = 0); //Default to just level 4 diagnostic, default to time = 0
@@ -53,6 +57,7 @@ class LI710: public Sensor
 
 		// const uint8_t sensorInterface = BusType::I2C; 
 	private:
+		ITimeProvider& timeProvider;
 		// Dps368 presSensor = Dps368();
 		// Adafruit_SHT31 rhSensor = Adafruit_SHT31();
 		const String group0Labels[7] = {"ET", "LE", "H", "VPD", "PA", "TA", "RH"}; //Omit last 2 entries (SEQ and DIAG) cause that is handled elsewhere
@@ -61,7 +66,7 @@ class LI710: public Sensor
 		const String group3Labels[8] = {"PUMP_V", "PA_CELL", "RH_CELL", "TA_CELL", "RH_ENCL", "FLOW", "INPUT_V", "DATA_QC"}; 
 		const uint8_t group3Precision[8] = {2, 2, 2, 2, 2, 0, 2, 0}; 
 
-		SDI12Talon& talon;
+		ISDI12Talon& talon; // Reference to the interface instead of concrete implementation
 		int indexOfSep(String input);
 		String appendData(float data, String label, uint8_t precision = 2, bool appendComma = true); //Default to precision of 2
 		bool parseData(String input, float dataReturn[], uint8_t dataLen);
