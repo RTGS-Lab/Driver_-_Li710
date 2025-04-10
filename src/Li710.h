@@ -77,6 +77,10 @@ class LI710: public Sensor
 
 		bool initDone = false; //Used to keep track if the initaliztion has run - used by hasReset() 
 		
+		float data0Vals[9] = {0.0};
+		float data1Vals[9] = {0.0};
+		float data2Vals[8] = {0.0};
+		float data3Vals[8] = {0.0};
 
 		// uint32_t errors[MAX_NUM_ERRORS] = {0};
 		// uint8_t numErrors = 0; //Used to track the index of errors array

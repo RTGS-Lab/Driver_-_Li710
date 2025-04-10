@@ -45,6 +45,7 @@ String LI710::begin(time_t time, bool &criticalFault, bool &fault)
 	return ""; //DEBUG!
 }
 
+//self diagnostic relies on getData being called for dataXVals to be populated
 String LI710::selfDiagnostic(uint8_t diagnosticLevel, time_t time)
 {
 	if(getSensorPort() == 0) throwError(FIND_FAIL); //If no port found, report failure
@@ -83,39 +84,13 @@ String LI710::selfDiagnostic(uint8_t diagnosticLevel, time_t time)
 				output = output + appendData(-9999, "TILT", 0, false); //Ignore trailing comma for last entry
 			}
 			else {
-				output = output + adr + ","; //Otherwise report the read value
-				//Grab other diagnostic values based on the address read
-				String data2 = talon.continuousMeasurmentCRC(2, adrVal);
-				// delay(100);
-				String data3 = talon.continuousMeasurmentCRC(3, adrVal);
-				// delay(100);
-
-				// talon.testCRC(data1); //DEBUG!
-				if(!talon.testCRC(data2) || !talon.testCRC(data3)) {
-					// Serial.println("LI710 CRC FAIL");
-					// continue; //If ANY CRC is bad, try again
-					for(int i = 0; i < 8; i++) { //Interate over all, ignoring sequence number and diagnostic value
-						output = output + appendData(-9999, group3Labels[i], group3Precision[i]); //Append null values
-					}
-					output = output + appendData(-9999, "TILT", 0, false); //Ignore trailing comma for last entry
+				for(int i = 0; i < 8; i++) { //Interate over all, ignoring sequence number and diagnostic value
+					output = output + appendData(data3Vals[i], group3Labels[i], group3Precision[i]);
+					// if(data0Vals[i] == -9999) output = output + "\"" + group0Labels[i] + "\":null,"; //Append null if value is error indicator
+					// else output = output + "\"" + group0Labels[i] + "\":" + String(data0Vals[i], group0Precision[i]) + ","; //Otherwise, append as normal using fixed specified precision
 				}
 
-				else {
-					float data2Vals[8] = {0.0};
-					float data3Vals[8] = {0.0};
-
-					parseData(data2, data2Vals, 8);  //Parse all data
-					parseData(data3, data3Vals, 8);
-
-
-					for(int i = 0; i < 8; i++) { //Interate over all, ignoring sequence number and diagnostic value
-						output = output + appendData(data3Vals[i], group3Labels[i], group3Precision[i]);
-						// if(data0Vals[i] == -9999) output = output + "\"" + group0Labels[i] + "\":null,"; //Append null if value is error indicator
-						// else output = output + "\"" + group0Labels[i] + "\":" + String(data0Vals[i], group0Precision[i]) + ","; //Otherwise, append as normal using fixed specified precision
-					}
-
-					output = output + appendData(data2Vals[7], "TILT", 0, false); //Ignore trailing comma for last entry
-				}
+				output = output + appendData(data2Vals[7], "TILT", 0, false); //Ignore trailing comma for last entry
 			}
 			output = output + ",";
 		}
@@ -184,19 +159,68 @@ String LI710::getData(time_t time)
 				continue; //If address is out of range, try again
 			}
 
-			// int waitTime = talon.startMeasurmentCRC(adr);
-			// if(waitTime <= 0) {
-			// 	// Serial.print("TDR315 Wait Time = "); //DEBUG!
-			// 	// Serial.println(waitTime);
-			// 	continue; //If wait time out of range, try again
-			// }
-			// uint8_t adr = (talon.sendCommand("?!")).toInt(); //Get address of local device 
-			// String stat = talon.command("MC", adr);
-
-			// Serial.print("STAT: "); //DEBUG!
-			// Serial.println(stat);
-
+			////////////////////Get Data from sensor///////////////////////////////////
+			String data0;
+			String data1;
+			String data2;
+			String data3;
+			//start next round of conversion
+			talon.command("XT", adr);
 			
+			int DATA_NUM = 4;
+			for (int i = 0; i < DATA_NUM; i++) {
+				int waitTime = 0;
+				String d0 = "";
+				String d1 = "";
+				String d2 = "";
+				switch(i)
+				{
+					case 0:
+						waitTime = talon.startMeasurment(adr);
+						break;
+					case 1:
+						waitTime = talon.startMeasurment(adr);
+						break;
+					case 2:
+						waitTime = talon.startMeasurment(adr);
+						break;
+					case 3:
+						waitTime = talon.startMeasurment(adr);
+						break;
+					default:
+						break;
+				}
+				
+				timeProvider.delay(waitTime * 1000 + 500);
+
+				d0 = talon.command("D0", adr);
+				d1 = talon.command("D1", adr);
+				d2 = talon.command("D2", adr);
+				
+				switch(i)
+				{
+					case 0:
+						data0 = d0 + d1.substring(1) + d2.substring(1);
+						break;
+					case 1:
+						data1 = d0 + d1.substring(1) + d2.substring(1);
+						break;
+					case 2:
+						data2 = d0 + d1.substring(1) + d2.substring(1);
+						break;
+					case 3:
+						data3 = d0 + d1.substring(1) + d2.substring(1);
+						break;
+					default:
+						break;
+				}
+			}
+
+
+			///////////////////////////////////////////////////////////////////////////
+
+			////////////////////Continuous method of getting data//////////////////////
+			/*
 			talon.command("XT", adr); //Start next round of conversion 
 			// delay(waitTime*1000 + 500); //Wait for number of seconds requested, plus half a second to make sure
 			String data0 = talon.continuousMeasurmentCRC(0, adr);
@@ -205,20 +229,25 @@ String LI710::getData(time_t time)
 			timeProvider.delay(100);
 			String data2 = talon.continuousMeasurmentCRC(2, adr);
 			timeProvider.delay(100);
-
+			
+			
 			// talon.testCRC(data1); //DEBUG!
 			if(!talon.testCRC(data0) || !talon.testCRC(data1) || !talon.testCRC(data2)) {
 				// Serial.println("LI710 CRC FAIL");
 				continue; //If ANY CRC is bad, try again
 			}
-
-			float data0Vals[9] = {0.0};
-			float data1Vals[9] = {0.0};
-			float data2Vals[8] = {0.0};
+				*/
+			////////////////////////////////////////////////////////////////////////////
+			
+			//float data0Vals[9] = {0.0};
+			//float data1Vals[9] = {0.0};
+			//float data2Vals[8] = {0.0};
+			//float data3Vals[8] = {0.0};
 
 			parseData(data0, data0Vals, 9);  //Parse all data
 			parseData(data1, data1Vals, 9);
 			parseData(data2, data2Vals, 8);
+			parseData(data3, data3Vals, 8);
 
 			decodeDiag(data0Vals[8]); //Parse and report error values 
 			decodeDiag(data1Vals[8]);
