@@ -174,23 +174,8 @@ String LI710::getData(time_t time)
 				String d0 = "";
 				String d1 = "";
 				String d2 = "";
-				switch(i)
-				{
-					case 0:
-						waitTime = talon.startMeasurment(adr);
-						break;
-					case 1:
-						waitTime = talon.startMeasurment(adr);
-						break;
-					case 2:
-						waitTime = talon.startMeasurment(adr);
-						break;
-					case 3:
-						waitTime = talon.startMeasurment(adr);
-						break;
-					default:
-						break;
-				}
+
+				waitTime = talon.startMeasurmentIndex(i, adr);
 				
 				timeProvider.delay(waitTime * 1000 + 500);
 
@@ -265,7 +250,8 @@ String LI710::getData(time_t time)
 			output = output + appendData(data1Vals[7], "SAMP_CNT", 0);
 			output = output + appendData(data2Vals[0], "AH", 2);
 			output = output + appendData(data2Vals[2], "SVP", 2);
-			output = output + appendData(data2Vals[7], "TD", 2, false); //Ignore trailing comma for last entry
+			output = output + appendData(data2Vals[7], "TD", 2);
+			output = output + appendData(data3Vals[7], "DATA_QC", 0, false); //Ignore trailing comma for last entry
 
 			// float sensorData[9] = {0.0}; //Store the 9 vals from the sensor in float form
 			// if((data.substring(0, data.indexOf("+"))).toInt() != adr) { //If address returned is not the same as the address read, throw error
