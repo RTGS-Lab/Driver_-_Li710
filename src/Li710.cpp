@@ -84,6 +84,7 @@ String LI710::selfDiagnostic(uint8_t diagnosticLevel, time_t time)
 				output = output + appendData(-9999, "TILT", 0, false); //Ignore trailing comma for last entry
 			}
 			else {
+				output = output + adr + ",";
 				for(int i = 0; i < 8; i++) { //Interate over all, ignoring sequence number and diagnostic value
 					output = output + appendData(data3Vals[i], group3Labels[i], group3Precision[i]);
 					// if(data0Vals[i] == -9999) output = output + "\"" + group0Labels[i] + "\":null,"; //Append null if value is error indicator
